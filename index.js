@@ -6,7 +6,7 @@ var parser = require('xml2json');
  * 
  * 
  * 
- * Args that should come from the app as arguments
+ * Args that should come from the app as arguments and should get
  * 
  * 
  *  */
@@ -101,16 +101,18 @@ function convertToXMLandSave(json,nameOfXMLFile)
 function splitPath(json,path)
 {
     var pathArr;
-    try {
-        pathArr= path.split('.');
-    }
-    catch(e) {
+    if(path.indexOf('.') == -1)
+    {
         return  json[path];
     }
-    
-    var currNode =pathArr.shift();
-    if(pathArr.length == 1)
-        return splitPath(json[currNode],pathArr)
     else
-       return splitPath(json[currNode],pathArr.join('.'))
+    {
+        pathArr= path.split('.');
+        var currNode =pathArr.shift();
+        if(pathArr.length == 1)
+            return splitPath(json[currNode],pathArr)
+        else
+           return splitPath(json[currNode],pathArr.join('.'))
+    }
+
 }
