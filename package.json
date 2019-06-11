@@ -1,0 +1,15 @@
+{
+  "name": "xmlexecutioner",
+  "version": "1.0.0",
+  "description": "Remove xml nodes smartly",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Menash Yamin",
+  "license": "MIT",
+  "dependencies": {
+    "fs": "0.0.1-security",
+    "xml2json": "^0.11.2"
+  }
+}
