@@ -3,7 +3,7 @@ var parser = require('xml2json');
 
 
 
-
+var removeEntitlementProcesses = true;
 
 
 // List of profiles and permsets files
@@ -45,9 +45,23 @@ const PERMISSION_SET = 'PermissionSet';
  * 
  **/
 
+//Remove entitlmentProcesses
+if(removeEntitlementProcesses){
+    var path_Entitlment_Proccess = "../../force-app-backup/main/default/entitlementProcesses/tm ico process.entitlementProcess-meta.xml" ;
+    if (fs.existsSync(path_Entitlment_Proccess)) {
+       fs.unlinkSync(path_Entitlment_Proccess);
+   }
+   var path_Entitlment_Proccess = "../../force-app-backup/main/default/entitlementProcesses/tm ofcom process.entitlementProcess-meta.xml" ;
+ if (fs.existsSync(path_Entitlment_Proccess)) {
+    fs.unlinkSync(path_Entitlment_Proccess);
+}
+var path_Entitlment_Proccess = "../../force-app-backup/main/default/entitlementProcesses/tm standard process.entitlementProcess-meta.xml" ;
+ if (fs.existsSync(path_Entitlment_Proccess)) {
+    fs.unlinkSync(path_Entitlment_Proccess);
+}
+}
+
  //Deleting unwanted password policies and setssion settings files
-
-
 
  var path_profile_pass_policy = "../../force-app-backup/main/default/profilePasswordPolicies/PT1_profilePasswordPolicy1559051539083.profilePasswordPolicy-meta.xml";
  var path_profile_session_settings = "../../force-app-backup/main/default/profileSessionSettings/PT1_profileSessionSetting1559051539141.profileSessionSetting-meta.xml";
