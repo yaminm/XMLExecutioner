@@ -16,10 +16,9 @@ var fieldPermissionsNames = ["Case.IsSelfServiceClosed", "Case.IsVisibleInSelfSe
 
 const FOLDER_BACK_UP = '../../../force-app-backup/main/default/';
 
-
-const PROFILES_FOLDER = FOLDER_BACK_UP+'profiles/';
-const PERMSETS_FOLDER = FOLDER_BACK_UP+'permissionsets/';
-const DASHBOARD_FOLDER = FOLDER_BACK_UP+'dashboards/Best_Practice_Service_Dashboards/';
+const PROFILES_FOLDER = FOLDER_BACK_UP  + 'profiles/';
+const PERMSETS_FOLDER = FOLDER_BACK_UP  + 'permissionsets/';
+const DASHBOARD_FOLDER = FOLDER_BACK_UP + 'dashboards/Best_Practice_Service_Dashboards/';
 
 /**
  * Const
@@ -115,10 +114,10 @@ console.log("Updating profiles");
 //update userPermissions in profiles
 PATH_TO_ARRAY = 'Profile.userPermissions';
 SEARCH_PATH_IN_ARRAY = 'name';
-for(let i=0;  i < profileFiles.length ;i++){
+for(var i=0;  i < profileFiles.length ;i++){
     FILE_NAME =  PROFILES_FOLDER+ profileFiles[i];
     OUTPUT_XML_FILE_NAME = FILE_NAME;
-    for(let j=0;  j <userPermissionsNames.length ;j++){
+    for(var j=0;  j <userPermissionsNames.length ;j++){
         SEARCH_TERM = userPermissionsNames[j];
         executeUpdate();
     }
@@ -127,16 +126,14 @@ for(let i=0;  i < profileFiles.length ;i++){
 //update fieldPermissions in profiles
 PATH_TO_ARRAY = 'Profile.fieldPermissions';
 SEARCH_PATH_IN_ARRAY = 'field';
-for(let i=0;  i < profileFiles.length ;i++){
+for(var i=0;  i < profileFiles.length ;i++){
     FILE_NAME =  PROFILES_FOLDER+ profileFiles[i];
     OUTPUT_XML_FILE_NAME = FILE_NAME;
-    for(let j=0;  j <fieldPermissionsNames.length ;j++){
+    for(var j=0;  j <fieldPermissionsNames.length ;j++){
         SEARCH_TERM = fieldPermissionsNames[j];
         executeUpdate();
     }
 }
-
-
 
 
 
@@ -157,9 +154,9 @@ function executeUpdate(){
  **/
 function manipulateFile(json) {
     partJson=splitPath(json,PATH_TO_ARRAY);
-    for(let i=0;  i <partJson.length ;i++)
+    for(var i=0;  i <partJson.length ;i++)
     {
-        let value = splitPath(partJson[i],SEARCH_PATH_IN_ARRAY+'.$t');//.$t - added by the xml2json package to every attribute with a value
+        var value = splitPath(partJson[i],SEARCH_PATH_IN_ARRAY+'.$t');//.$t - added by the xml2json package to every attribute with a value
         if(value == SEARCH_TERM)
         {
             console.log('remove field ' + value);
