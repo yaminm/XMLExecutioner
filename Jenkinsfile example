@@ -1,0 +1,245 @@
+#!groovy
+
+import groovy.json.JsonSlurperClassic
+node {
+
+    BUILD_NUMBER = env.BUILD_NUMBER
+    RUN_ARTIFACT_DIR = "tests/${BUILD_NUMBER}"
+    SCRATCH_ORG_SFDC_USERNAME = ''
+    BRANCH_NAME = env.BRANCH_NAME
+
+    HUB_ORG = 'HUB_ORG'
+    //def SFDC_HOST = env.SFDC_HOST_DH
+    //def JWT_KEY_CRED_ID = env.JWT_KEY_FILE
+    JWT_KEY_CRED_ID = 'JWT_KEY_FILE'
+    CONNECTED_APP_CONSUMER_KEY = 'CONNECTED_APP_CONSUMER_KEY'
+
+    HUB_ORG_CI = 'HUB_ORG_CI'
+    JWT_KEY_CRED_ID_CI = 'JWT_KEY_FILE_CI'
+    CONNECTED_APP_CONSUMER_KEY_CI = 'CONNECTED_APP_CONSUMER_KEY_CI'
+
+    HUB_ORG_QA = 'HUB_ORG_QA'
+    JWT_KEY_CRED_ID_QA = 'JWT_KEY_FILE_QA'
+    CONNECTED_APP_CONSUMER_KEY_QA = 'CONNECTED_APP_CONSUMER_KEY_QA'
+
+    MINIMUM_ALLOWED_TEST_COVERAGE = 80 // less then that -> error.
+
+
+    println('printed from the child')
+    println('Is pr : ' + isPRMergeBuild())
+    println('Is develop : ' + isDevelopBranch())
+    println('Is release : ' + isReleaseBranch())
+	checkoutSource()
+    if (isPRMergeBuild()) {
+	withCredentials([file(credentialsId: JWT_KEY_CRED_ID, variable: 'jwt_key_file'),
+        	string(credentialsId: HUB_ORG, variable: 'HUB'),
+        	string(credentialsId: CONNECTED_APP_CONSUMER_KEY, variable: 'CONNECTED_APP_KEY')
+    	]) {
+        	createScratchOrg()
+        	pushSource()
+        	runApexTests()
+        	deleteScratchOrgStage()
+            	runNPM()
+            	sandboxFlow(JWT_KEY_CRED_ID_CI, HUB_ORG_CI, CONNECTED_APP_CONSUMER_KEY_CI,"CI")
+    	   }
+    }
+    if(isDevelopBranch()){
+	
+        runNPM()
+        sandboxFlow(JWT_KEY_CRED_ID_QA, HUB_ORG_QA, CONNECTED_APP_CONSUMER_KEY_QA,"QA")
+    }
+
+}
+
+def isPRMergeBuild() {
+    println('Branch Name : '+ BRANCH_NAME)
+    return (BRANCH_NAME.startsWith('PR-'))
+}
+
+
+def isDevelopBranch() {
+    println('Branch Name : '+ BRANCH_NAME)
+    return (BRANCH_NAME.startsWith('mirror')) //MY: Achraf, after testing change the startsWith to equalsIgnoreCase too//just to test in this branch and keep develop branch safe //
+}
+
+def isReleaseBranch() {
+    println('Branch Name : '+ BRANCH_NAME)
+    return (BRANCH_NAME.equalsIgnoreCase('release'))
+}
+
+def checkoutSource() {
+    stage('checkout source') {
+        checkout scm
+    }
+}
+
+
+
+
+def createScratchOrg() {
+    stage('Create Scratch Org') {
+
+        rc = sh returnStatus: true, script: "sfdx force:auth:jwt:grant --clientid ${CONNECTED_APP_KEY} --username ${HUB} --jwtkeyfile ${jwt_key_file} --setdefaultdevhubusername "
+        if (rc != 0) {
+           errorHandling('hub org authorization failed')
+        }
+
+        // need to pull out assigned username
+        rmsg = sh returnStdout: true, script: "sfdx force:org:create --definitionfile config/project-scratch-def.json --json --setdefaultusername"
+        def beginIndex = rmsg.indexOf('{')
+        def endIndex = rmsg.indexOf('}')
+        def jsobSubstring = rmsg.substring(beginIndex)
+        def jsonSlurperClass = new JsonSlurperClassic()
+        def robj = jsonSlurperClass.parseText(jsobSubstring)
+        SCRATCH_ORG_SFDC_USERNAME = robj.result.username
+        robj = null
+
+    }
+}
+def deleteScratchOrg() {
+        timeout(time: 120, unit: 'SECONDS') {
+            rc = sh returnStatus: true, script: "sfdx force:org:delete --targetusername ${SCRATCH_ORG_SFDC_USERNAME} --noprompt"
+            if (rc != 0) {
+                errorHandling('org deletion request failed')
+            }
+        }
+}
+
+
+def deleteScratchOrgStage()
+{
+        stage('Delete Test Org') {
+            deleteScratchOrg()
+        }
+}
+def runApexTests() {
+    stage('Run Apex Test') {
+        sh "mkdir -p ${RUN_ARTIFACT_DIR}"
+        timeout(time: 180, unit: 'SECONDS') {
+            rc = sh returnStatus: true, script: "sfdx force:apex:test:run --testlevel RunLocalTests --outputdir ${RUN_ARTIFACT_DIR} --resultformat tap --targetusername ${SFDC_USERNAME} --wait 2"
+            if (rc != 0) {
+                errorHandling('apex test run failed',true) 
+            }
+        }
+    }
+}
+
+def pushSource() {
+    stage('Push Source Test Org') {
+        rc = sh returnStatus: true, script: "sfdx force:source:push --targetusername ${SCRATCH_ORG_SFDC_USERNAME}"
+        if (rc != 0) {
+            errorHandling('push failed',true) 
+        }
+    }
+}
+
+def runNPM()
+{
+    stage('run NPM') {
+         println('\n\n\n\n run NPM ')
+        rc = sh returnStatus: true, script: "npm config ls"
+        if (rc != 0) {
+            error '1'
+        }
+        
+        sh 'npm i  @yaminm/xmlexecutioner'
+        sh "npm start --prefix node_modules/@yaminm/xmlexecutioner"
+        rc = sh returnStatus: true, script: "npm start --prefix node_modules/@yaminm/xmlexecutioner"
+        if (rc != 0) {
+            error '1'
+        }
+        println('\n\n\n\n npm start --prefix ./node_modules/@yaminm/xmlexecutioner ')
+
+     }
+}
+
+def sandboxFlow(String jwKeyFile, String hubUsername, String connectedAppKey,String sandboxNname)
+{
+   println("jwtKeyFile : "+jwKeyFile)
+   println("hubUsername : "+hubUsername) 
+   println("connectedAppKey : "+connectedAppKey) 
+	
+    withCredentials([file(credentialsId: jwKeyFile, variable: 'jwt_key_file'),
+    string(credentialsId: hubUsername, variable: 'HUB'),
+    string(credentialsId: connectedAppKey, variable: 'CONNECTED_APP_KEY')
+    ]) {   
+        //authenticate Sandbox
+	//HUB contain the username in the sandbox  
+        authenticationSandbox(sandboxNname);
+        pushSandboxSource();
+        runSandboxApexTests();
+        
+     }
+}
+
+def authenticationSandbox(String sbName){
+	stage('Athentication to Sandbox') {
+			println "Authentication to "+sbName+" Sandbox"
+			rc = sh returnStatus: true, script: "sfdx force:auth:jwt:grant --clientid ${CONNECTED_APP_KEY} --username ${HUB} --jwtkeyfile ${jwt_key_file} -r https://test.salesforce.com"
+			if (rc != 0) {
+			errorHandling('hub org authorization failed')
+        }
+	}
+	
+}
+
+def pushSandboxSource() {
+    stage('Push Source to SB  Org') {
+        
+        rc = sh returnStatus: true, script: "sfdx force:source:deploy -p ./force-app --targetusername ${HUB}   -w 2"
+        if (rc != 0) {
+            errorHandling( 'push failed')
+        }
+    }
+}
+
+def runSandboxApexTests() {
+    stage('Run SandBox Apex Test') {
+        sh "mkdir -p ${RUN_ARTIFACT_DIR}"
+        timeout(time: 180, unit: 'SECONDS') {
+            rc = sh returnStatus: true, script: "sfdx force:apex:test:run --testlevel RunLocalTests --outputdir ${RUN_ARTIFACT_DIR} --resultformat tap --targetusername ${HUB} --wait 2 --json"
+            
+            testRunId = sh returnStdout: true, script: "cat ${RUN_ARTIFACT_DIR}/test-run-id.txt" //get the test job id
+            println "testRunId : ${testRunId}"
+            
+            println "cat ${RUN_ARTIFACT_DIR}/test-result-${testRunId}.json"
+            testResultJson = sh returnStdout: true, script: "cat ${RUN_ARTIFACT_DIR}/test-result-${testRunId}.json" // get the full test reoport
+            
+            
+            def jsonSlurperClass = new JsonSlurperClassic()
+            def robj = jsonSlurperClass.parseText(testResultJson)// use JsonSlurperClassic to dril inside json easily 
+           
+        
+            TEST_OUTCOME = robj.summary.outcome // if the test failed or succcessded
+            TEST_COVERAGE_PERCENT =robj.summary.passRate.minus('%') as Integer //the test coverage percentage
+            robj = null
+            
+
+            if(TEST_COVERAGE_PERCENT < MINIMUM_ALLOWED_TEST_COVERAGE)
+            {
+                errorHandling("Error:Test coverage is ${TEST_COVERAGE_PERCENT}.The minimum allowed is: ${MINIMUM_ALLOWED_TEST_COVERAGE}")
+            }
+
+            if("Failed".equalsIgnoreCase(TEST_OUTCOME))
+            {
+                errorHandling('Error: apex test  failed')
+            }
+        }
+    }
+}
+
+
+
+
+def errorHandling(String msg)
+{
+    errorHandlingx(msg,false);
+}
+def errorHandling(msg, isdeleteScratchOrg)
+{
+    if(isdeleteScratchOrg)
+    {
+        deleteScratchOrg();
+    }
+    error 'ERROR:'+ msg
+} 
